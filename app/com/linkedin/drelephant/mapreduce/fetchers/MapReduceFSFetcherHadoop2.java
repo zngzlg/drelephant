@@ -310,8 +310,7 @@ public class MapReduceFSFetcherHadoop2 extends MapReduceFetcher {
       MapReduceCounterData taskCounterData = getCounterData(tInfo.getCounters());
       long[] taskExecTime = getTaskExecTime(tInfo.getAllTaskAttempts().get(attemptId));
 
-      taskList[i].setCounter(taskCounterData);
-      taskList[i].setTime(taskExecTime);
+      taskList[i].setTimeAndCounter(taskExecTime, taskCounterData);
     }
     return taskList;
   }
