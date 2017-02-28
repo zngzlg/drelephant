@@ -51,7 +51,14 @@ class SparkRestClient(sparkConf: SparkConf) {
 
   private val historyServerUri: URI = sparkConf.getOption(HISTORY_SERVER_ADDRESS_KEY) match {
     case Some(historyServerAddress) =>
-      val baseUri = new URI(s"http://${historyServerAddress}")
+      val baseUri: URI =
+        // Latest versions of CDH include http in their history server address configuration.
+        // However, it is not recommended by Spark documentation(http://spark.apache.org/docs/latest/running-on-yarn.html)
+        if (historyServerAddress.contains(s"http://")) {
+          new URI(historyServerAddress)
+        } else {
+          new URI(s"http://${historyServerAddress}")
+        }
       require(baseUri.getPath == "")
       baseUri
     case None =>
