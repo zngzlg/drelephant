@@ -19,6 +19,7 @@ package com.linkedin.drelephant.spark.fetchers
 import scala.async.Async
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, SECONDS}
+import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal
 
 import com.linkedin.drelephant.analysis.{AnalyticJob, ElephantFetcher}
@@ -36,9 +37,13 @@ import org.apache.spark.SparkConf
 class SparkFetcher(fetcherConfigurationData: FetcherConfigurationData)
     extends ElephantFetcher[SparkApplicationData] {
   import SparkFetcher._
+  import Async.{async, await}
   import ExecutionContext.Implicits.global
 
   private val logger: Logger = Logger.getLogger(classOf[SparkFetcher])
+
+  val eventLogUri = Option(fetcherConfigurationData.getParamMap.get(LOG_LOCATION_URI_XML_FIELD))
+  logger.info("The event log location of Spark application is set to " + eventLogUri)
 
   private[fetchers] lazy val hadoopConfiguration: Configuration = new Configuration()
 
@@ -46,7 +51,7 @@ class SparkFetcher(fetcherConfigurationData: FetcherConfigurationData)
 
   private[fetchers] lazy val sparkConf: SparkConf = {
     val sparkConf = new SparkConf()
-    sparkUtils.getDefaultPropertiesFile(sparkUtils.defaultEnv) match {
+    sparkUtils.getDefaultPropertiesFile() match {
       case Some(filename) => sparkConf.setAll(sparkUtils.getPropertiesFromFile(filename))
       case None => throw new IllegalStateException("can't find Spark conf; please set SPARK_HOME or SPARK_CONF_DIR")
     }
@@ -65,25 +70,51 @@ class SparkFetcher(fetcherConfigurationData: FetcherConfigurationData)
   private[fetchers] lazy val sparkRestClient: SparkRestClient = new SparkRestClient(sparkConf)
 
   private[fetchers] lazy val sparkLogClient: SparkLogClient = {
-    new SparkLogClient(hadoopConfiguration, sparkConf)
+    new SparkLogClient(hadoopConfiguration, sparkConf, eventLogUri)
   }
 
   override def fetchData(analyticJob: AnalyticJob): SparkApplicationData = {
-    val appId = analyticJob.getAppId
-    logger.info(s"Fetching data for ${appId}")
-    try {
-      Await.result(doFetchData(sparkRestClient, sparkLogClient, appId, eventLogSource),
-        DEFAULT_TIMEOUT)
-    } catch {
-      case NonFatal(e) =>
-        logger.error(s"Failed fetching data for ${appId}", e)
-        throw e
+    doFetchData(analyticJob) match {
+      case Success(data) => data
+      case Failure(e) => throw e
     }
   }
+
+  private def doFetchData(analyticJob: AnalyticJob): Try[SparkApplicationData] = {
+    val appId = analyticJob.getAppId
+    logger.info(s"Fetching data for ${appId}")
+    Try {
+      Await.result(doFetchDataUsingRestAndLogClients(analyticJob), DEFAULT_TIMEOUT)
+    }.transform(
+      data => {
+        logger.info(s"Succeeded fetching data for ${appId}")
+        Success(data)
+      },
+      e => {
+        logger.error(s"Failed fetching data for ${appId}", e)
+        Failure(e)
+      }
+    )
+  }
+
+  private def doFetchDataUsingRestAndLogClients(analyticJob: AnalyticJob): Future[SparkApplicationData] = async {
+    val appId = analyticJob.getAppId
+    val restDerivedData = await(sparkRestClient.fetchData(appId, eventLogSource == EventLogSource.Rest))
+
+    val logDerivedData = eventLogSource match {
+      case EventLogSource.None => None
+      case EventLogSource.Rest => restDerivedData.logDerivedData
+      case EventLogSource.WebHdfs =>
+        val lastAttemptId = restDerivedData.applicationInfo.attempts.maxBy { _.startTime }.attemptId
+        Some(await(sparkLogClient.fetchData(appId, lastAttemptId)))
+    }
+
+    SparkApplicationData(appId, restDerivedData, logDerivedData)
+  }
+
 }
 
 object SparkFetcher {
-  import Async.{async, await}
 
   sealed trait EventLogSource
 
@@ -97,27 +128,6 @@ object SparkFetcher {
   }
 
   val SPARK_EVENT_LOG_ENABLED_KEY = "spark.eventLog.enabled"
-  val DEFAULT_TIMEOUT = Duration(30, SECONDS)
-
-  private def doFetchData(
-    sparkRestClient: SparkRestClient,
-    sparkLogClient: SparkLogClient,
-    appId: String,
-    eventLogSource: EventLogSource
-  )(
-    implicit ec: ExecutionContext
-  ): Future[SparkApplicationData] = async {
-    val restDerivedData = await(sparkRestClient.fetchData(
-      appId, eventLogSource == EventLogSource.Rest))
-
-    val logDerivedData = eventLogSource match {
-      case EventLogSource.None => None
-      case EventLogSource.Rest => restDerivedData.logDerivedData
-      case EventLogSource.WebHdfs =>
-        val lastAttemptId = restDerivedData.applicationInfo.attempts.maxBy { _.startTime }.attemptId
-        Some(await(sparkLogClient.fetchData(appId, lastAttemptId)))
-    }
-
-    SparkApplicationData(appId, restDerivedData, logDerivedData)
-  }
+  val DEFAULT_TIMEOUT = Duration(60, SECONDS)
+  val LOG_LOCATION_URI_XML_FIELD = "event_log_location_uri"
 }
