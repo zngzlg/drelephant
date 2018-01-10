@@ -81,7 +81,7 @@
   -->
   <fetcher>
     <applicationtype>spark</applicationtype>
-    <classname>com.linkedin.drelephant.spark.fetchers.SparkFetcher</classname>
+    <classname>com.linkedin.drelephant.spark.fetchers.FSFetcher</classname>
   </fetcher>
 
   <!--
