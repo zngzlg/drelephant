@@ -23,12 +23,16 @@ version := "2.0.13"
 
 organization := "com.linkedin.drelephant"
 
-javacOptions in Compile ++= Seq("-source", "1.6", "-target", "1.6")
+javacOptions in Compile ++= Seq("-source", "1.7", "-target", "1.7")
 
 libraryDependencies ++= dependencies map { _.excludeAll(exclusionRules: _*) }
 
 // Create a new custom configuration called compileonly
 ivyConfigurations += config("compileonly").hide
+
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.5.4"
+
+libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % "2.3.4"
 
 // Append all dependencies with 'compileonly' configuration to unmanagedClasspath in Compile.
 unmanagedClasspath in Compile ++= update.value.select(configurationFilter("compileonly"))

@@ -21,19 +21,14 @@ import com.linkedin.drelephant.ElephantContext;
 import com.linkedin.drelephant.mapreduce.heuristics.CommonConstantsHeuristic;
 import com.linkedin.drelephant.util.Utils;
 import controllers.AutoTuningMetricsController;
-import java.util.ArrayList;
-import java.util.List;
-import models.AppHeuristicResult;
-import models.AppHeuristicResultDetails;
-import models.AppResult;
-import models.JobDefinition;
-import models.JobExecution;
-import models.TuningJobDefinition;
-import models.TuningJobExecution;
+import models.*;
 import models.TuningJobExecution.ParamSetStatus;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.Logger;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -231,12 +226,12 @@ public class FitnessComputeUtil {
     if (appResult.yarnAppHeuristicResults != null) {
       for (AppHeuristicResult appHeuristicResult : appResult.yarnAppHeuristicResults) {
         if (appHeuristicResult.heuristicName.equals(CommonConstantsHeuristic.MAPPER_SPEED)) {
-          if (appHeuristicResult.yarnAppHeuristicResultDetails != null) {
-            for (AppHeuristicResultDetails appHeuristicResultDetails : appHeuristicResult.yarnAppHeuristicResultDetails) {
-              if (appHeuristicResultDetails.name.equals(CommonConstantsHeuristic.TOTAL_INPUT_SIZE_IN_MB)) {
-                totalInputBytes += Math.round(Double.parseDouble(appHeuristicResultDetails.value) * FileUtils.ONE_MB);
-              }
-            }
+
+
+              if (appHeuristicResult.name.equals(CommonConstantsHeuristic.TOTAL_INPUT_SIZE_IN_MB)) {
+                totalInputBytes += Math.round(Double.parseDouble(appHeuristicResult.value) * FileUtils.ONE_MB);
+
+
           }
         }
       }

@@ -85,12 +85,12 @@
                         <p><b>@appHeuristicResult.heuristicName</b></p>
                         <table class="list-group-item-text table table-condensed" style="color:black;">
                           <tbody>
-                          @for(appHeuristicResultDetail <- appHeuristicResult.yarnAppHeuristicResultDetails) {
+
                             <tr>
-                              <td>@appHeuristicResultDetail.name</td>
-                              <td>@appHeuristicResultDetail.value</td>
+                              <td>@appHeuristicResult.name</td>
+                              <td>@appHeuristicResult.value</td>
                             </tr>
-                          }
+
                           </tbody>
                         </table>
                       </div>

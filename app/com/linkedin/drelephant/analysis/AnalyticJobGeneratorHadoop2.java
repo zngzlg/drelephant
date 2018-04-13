@@ -19,17 +19,17 @@ package com.linkedin.drelephant.analysis;
 import com.linkedin.drelephant.ElephantContext;
 import com.linkedin.drelephant.math.Statistics;
 import controllers.MetricsController;
-import java.io.IOException;
-import java.net.URL;
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import models.AppResult;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 /**
@@ -230,20 +230,19 @@ public class AnalyticJobGeneratorHadoop2 implements AnalyticJobGenerator {
     JsonNode apps = rootNode.path("apps").path("app");
 
     for (JsonNode app : apps) {
-      String appId = app.get("id").getValueAsText();
+      String appId = app.get("id").getTextValue();
 
       // When called first time after launch, hit the DB and avoid duplicated analytic jobs that have been analyzed
       // before.
-      if (_lastTime > _fetchStartTime || (_lastTime == _fetchStartTime && AppResult.find.byId(appId) == null)) {
-        String user = app.get("user").getValueAsText();
-        String name = app.get("name").getValueAsText();
-        String queueName = app.get("queue").getValueAsText();
-        String trackingUrl = app.get("trackingUrl") != null? app.get("trackingUrl").getValueAsText() : null;
+      if (_lastTime >= _fetchStartTime ) {
+        String user = app.get("user").getTextValue();
+        String name = app.get("name").getTextValue();
+        String queueName = app.get("queue").getTextValue();
+        String trackingUrl = app.get("trackingUrl") != null? app.get("trackingUrl").getTextValue() : null;
         long startTime = app.get("startedTime").getLongValue();
         long finishTime = app.get("finishedTime").getLongValue();
-
         ApplicationType type =
-            ElephantContext.instance().getApplicationTypeForName(app.get("applicationType").getValueAsText());
+            ElephantContext.instance().getApplicationTypeForName(app.get("applicationType").getTextValue());
 
         // If the application type is supported
         if (type != null) {

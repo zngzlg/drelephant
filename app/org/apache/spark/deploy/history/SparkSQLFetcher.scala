@@ -16,8 +16,11 @@
 
 package org.apache.spark.deploy.history
 
+import java.io.File
 import java.nio.charset.MalformedInputException
 import java.security.PrivilegedAction
+import java.util.{Calendar, TimeZone}
+
 import com.linkedin.drelephant.analysis.{AnalyticJob, ElephantFetcher}
 import com.linkedin.drelephant.configurations.fetcher.FetcherConfigurationData
 import com.linkedin.drelephant.security.HadoopSecurity
@@ -25,15 +28,18 @@ import com.linkedin.drelephant.spark.legacydata.SparkApplicationData
 import com.linkedin.drelephant.util.{HadoopUtils, SparkUtils, Utils}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{ FileSystem, Path}
 import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
 
 
+
+
 /**
- * A wrapper that replays Spark event history from files and then fill proper data objects.
- */
-class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends ElephantFetcher[SparkApplicationData] {
-  import SparkFSFetcher._
+  * A wrapper that replays Spark event history from files and then fill proper data objects.
+  */
+class SparkSQLFetcher(fetcherConfData: FetcherConfigurationData) extends ElephantFetcher[SparkApplicationData] {
+  import SparkSQLFetcher._
 
   val eventLogSizeLimitMb =
     Option(fetcherConfData.getParamMap.get(LOG_SIZE_XML_FIELD))
@@ -62,25 +68,33 @@ class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends Elephant
   }
 
   def fetchData(analyticJob: AnalyticJob): SparkApplicationData = {
-    val appId = analyticJob.getAppId()
-    doAsPrivilegedAction { () =>  doFetchData(appId)
+    val appId = analyticJob.getAppId
+    val _timeZone = TimeZone.getTimeZone(HISTORY_SERVER_TIME_ZONE)
+    val timestamp = Calendar.getInstance(_timeZone)
+    timestamp.setTimeInMillis(analyticJob.getFinishTime)
+    val datePart = String.format(TIMESTAMP_DIR_FORMAT,
+      timestamp.get(Calendar.YEAR):Integer,
+      timestamp.get(Calendar.MONTH) + 1 :Integer,
+      timestamp.get(Calendar.DAY_OF_MONTH):Integer,
+      timestamp.get(Calendar.HOUR_OF_DAY):Integer)
+    logger.info(String.format("job finish time is %s", datePart))
+
+    doAsPrivilegedAction { () =>  doFetchData(appId, datePart)
     }
   }
 
   protected def doAsPrivilegedAction[T](action: () => T): T =
     security.doAs[T](new PrivilegedAction[T] { override def run(): T = action() })
 
-  protected def doFetchData(appId: String): SparkDataCollection = {
+  protected def doFetchData(appId: String, dir:String): SparkDataCollection = {
 
     val dataCollection = new SparkDataCollection()
     // using supergroup
     hadoopConfiguration.set("hadoop.job.ugi","hdfsadmin,supergroup")
 
-    val (eventLogFileSystem, baseEventLogPath) =
-      sparkUtils.fileSystemAndPathForEventLogDir(hadoopConfiguration, sparkConf, eventLogUri, appId)
-    val (eventLogPath, eventLogCodec) =
-      sparkUtils.pathAndCodecforEventLog(sparkConf, eventLogFileSystem, baseEventLogPath, appId, None)
+    val eventLogPath = new Path(List(eventLogUri.get,dir,appId).mkString(File.separator))
 
+    val eventLogFileSystem = FileSystem.get(eventLogPath.toUri,hadoopConfiguration)
     // Check if the log parser should be throttled when the file is too large.
     val shouldThrottle = eventLogFileSystem.getFileStatus(eventLogPath).getLen() > (eventLogSizeLimitMb * FileUtils.ONE_MB)
     if (shouldThrottle) {
@@ -94,11 +108,12 @@ class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends Elephant
         + eventLogSizeLimitMb + " MB, the parsing process gets throttled.")
     } else {
       logger.info("Replaying Spark logs for application: " + appId +
-                          " withlogPath: " + eventLogPath +
-                          " with codec:" + eventLogCodec)
+        " withlogPath: " + eventLogPath +
+        " with no codec")
       //if event log file corrupt ,then logging instead retry.
       try {
-        sparkUtils.withEventLog(eventLogFileSystem, eventLogPath, eventLogCodec) { in =>
+        logger.info("fetch SparkSQL job from: " + eventLogPath.toString)
+        sparkUtils.withEventLog(eventLogFileSystem, eventLogPath, None) { in =>
           dataCollection.load(in, eventLogPath.toString())
         }
       }
@@ -113,10 +128,14 @@ class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends Elephant
   }
 }
 
-object SparkFSFetcher {
-  private val logger = Logger.getLogger(SparkFSFetcher.getClass)
+object SparkSQLFetcher {
+  private val logger = Logger.getLogger(SparkSQLFetcher.getClass)
+
+  val TIMESTAMP_DIR_FORMAT = "%04d%02d%02d%02d";
 
   val DEFAULT_EVENT_LOG_SIZE_LIMIT_MB = 100d; // 100MB
+
+  val HISTORY_SERVER_TIME_ZONE = "Asia/Shanghai"
 
   val LOG_SIZE_XML_FIELD = "event_log_size_limit_in_mb"
 

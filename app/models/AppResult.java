@@ -18,19 +18,11 @@ package models;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.linkedin.drelephant.analysis.Severity;
-
 import com.linkedin.drelephant.util.Utils;
-import java.util.Date;
 import play.db.ebean.Model;
 
+import javax.persistence.*;
 import java.util.List;
-
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
 
 
 @Entity
@@ -49,15 +41,49 @@ public class AppResult extends Model {
   public static final int SCHEDULER_LIMIT = 20;
   public static final int URL_LEN_LIMIT = 800;
   public static final int FLOW_EXEC_ID_LIMIT = 255;
+  public static final int FTIME_HOUR = 10;
+
+  public String getJobExecId() {
+    return jobExecId;
+  }
+
+  public String getJobDefId() {
+    return jobDefId;
+  }
+
+  public String getFlowExecId() {
+    return flowExecId;
+  }
+
+  public String getFlowDefId() {
+    return flowDefId;
+  }
+
+  public String getJobExecUrl() {
+    return jobExecUrl;
+  }
+
+  public String getJobDefUrl() {
+    return jobDefUrl;
+  }
+
+  public String getFlowExecUrl() {
+    return flowExecUrl;
+  }
+
+  public String getFlowDefUrl() {
+    return flowDefUrl;
+  }
 
   // Note that the Table column constants are actually the java variable names defined in this model.
   // This is because ebean operations require the model variable names to be passed as strings.
   public static class TABLE {
     public static final String TABLE_NAME = "yarn_app_result";
+    public static final String FTIME = "ftime";
     public static final String ID = "id";
     public static final String NAME = "name";
     public static final String USERNAME = "username";
-      public static final String QUEUE_NAME = "queueName";
+    public static final String QUEUE_NAME = "queueName";
     public static final String START_TIME = "startTime";
     public static final String FINISH_TIME = "finishTime";
     public static final String TRACKING_URL = "trackingUrl";
@@ -85,6 +111,9 @@ public class AppResult extends Model {
     return Utils.commaSeparated(AppResult.TABLE.NAME, AppResult.TABLE.USERNAME, TABLE.QUEUE_NAME, AppResult.TABLE.JOB_TYPE,
         AppResult.TABLE.SEVERITY, AppResult.TABLE.FINISH_TIME);
   }
+
+  @Column(nullable = false)
+  public long ftime;
 
   @Id
   @Column(length = ID_LIMIT, unique = true, nullable = false)

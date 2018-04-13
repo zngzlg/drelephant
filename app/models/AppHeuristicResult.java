@@ -16,24 +16,12 @@
 
 package models;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import java.util.List;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Lob;
-import javax.persistence.ManyToOne;
-
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
-
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.linkedin.drelephant.analysis.Severity;
 import com.linkedin.drelephant.util.Utils;
-
 import play.db.ebean.Model;
+
+import javax.persistence.*;
 
 
 @Entity
@@ -45,23 +33,29 @@ public class AppHeuristicResult extends Model {
   public static final int HEURISTIC_NAME_LIMIT = 128;
   public static final int HEURISTIC_CLASS_LIMIT = 255;
 
+  // heuristic_result_detail
+  public static final int NAME_LIMIT = 128;
+  public static final int VALUE_LIMIT = 255;
+  public static final int DETAILS_LIMIT = 65535;
+
+
   public static class TABLE {
     public static final String TABLE_NAME = "yarn_app_heuristic_result";
-    public static final String ID = "id";
+    public static final String FTIME = "ftime";
     public static final String APP_RESULT_ID = "yarnAppResult";
     public static final String HEURISTIC_NAME = "heuristicName";
+    public static final String APP_HEURISTIC_RESULT_ID = "yarnAppHeuristicResult";
+    public static final String APP_HEURISTIC_RESULT_DETAILS = "yarnAppHeuristicResultDetails";
     public static final String SEVERITY = "severity";
     public static final String SCORE = "score";
-    public static final String APP_HEURISTIC_RESULT_DETAILS = "yarnAppHeuristicResultDetails";
+    public static final String NAME = "name";
+    public static final String VALUE = "value";
+    public static final String DETAILS = "details";
   }
 
   public static String getSearchFields() {
     return Utils.commaSeparated(AppHeuristicResult.TABLE.HEURISTIC_NAME, AppHeuristicResult.TABLE.SEVERITY);
   }
-
-  @JsonIgnore
-  @Id
-  public int id;
 
   @JsonBackReference
   @ManyToOne(cascade = CascadeType.ALL)
@@ -69,6 +63,9 @@ public class AppHeuristicResult extends Model {
 
   @Column(length = HEURISTIC_CLASS_LIMIT, nullable = false)
   public String heuristicClass;
+
+  @Column(nullable = false)
+  public long ftime;
 
   @Column(length = HEURISTIC_NAME_LIMIT, nullable = false)
   public String heuristicName;
@@ -79,8 +76,15 @@ public class AppHeuristicResult extends Model {
   @Column(nullable = false)
   public int score;
 
-  @JsonManagedReference
-  @OneToMany(cascade = CascadeType.ALL, mappedBy = "yarnAppHeuristicResult")
-  public List<AppHeuristicResultDetails> yarnAppHeuristicResultDetails;
+  // heuristic_result_detail
+  @Column(length=NAME_LIMIT, nullable = false)
+  public String name;
+
+  @Column(length=VALUE_LIMIT, nullable = false)
+  public String value;
+
+  @Column(nullable = true)
+  public String details;
+
 
 }

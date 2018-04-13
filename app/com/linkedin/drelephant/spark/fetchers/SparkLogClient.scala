@@ -60,7 +60,7 @@ class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, e
     implicit ec: ExecutionContext
   ): Future[SparkLogDerivedData] = {
     val (eventLogFileSystem, baseEventLogPath) =
-      sparkUtils.fileSystemAndPathForEventLogDir(hadoopConfiguration, sparkConf, eventLogUri)
+      sparkUtils.fileSystemAndPathForEventLogDir(hadoopConfiguration, sparkConf, eventLogUri, appId)
     val (eventLogPath, eventLogCodec) =
       sparkUtils.pathAndCodecforEventLog(sparkConf, eventLogFileSystem, baseEventLogPath, appId, attemptId)
 

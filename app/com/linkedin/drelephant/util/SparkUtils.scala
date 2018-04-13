@@ -16,15 +16,14 @@
 
 package com.linkedin.drelephant.util
 
-import java.io.{BufferedInputStream, File, FileInputStream, FileNotFoundException, InputStream, InputStreamReader}
+import java.io._
 import java.net.URI
 import java.util.Properties
 
 import scala.collection.JavaConverters
 import scala.collection.mutable.HashMap
-
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path, PathFilter, FileStatus}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
 import org.apache.spark.io.{CompressionCodec, LZ4CompressionCodec, LZFCompressionCodec, SnappyCompressionCodec}
@@ -56,11 +55,38 @@ trait SparkUtils {
     */
   def fileSystemAndPathForEventLogDir(hadoopConfiguration: Configuration,
                                       sparkConf: SparkConf,
-                                      uriFromFetcherConf : Option[String]): (FileSystem, Path) = {
+                                      uriFromFetcherConf : Option[String], appId: String): (FileSystem, Path) = {
     if(uriFromFetcherConf.isDefined) {
-      logger.info(s"Using log location from FetcherConf ${uriFromFetcherConf}")
-      val uri = new URI(uriFromFetcherConf.get)
-      (FileSystem.get(uri, hadoopConfiguration), new Path(uri.getPath))
+      logger.info(s"Using log location from FetcherConf ${uriFromFetcherConf.get}")
+      if(uriFromFetcherConf.get.contains(';')) {
+        logger.info(s"Start find log location in several event log locations.")
+        val history_hdfs_urls = uriFromFetcherConf.get.split(";")
+        val default_uri = new URI(history_hdfs_urls(0))
+        for (history_hdfs <- history_hdfs_urls) {
+          val uri = new URI(history_hdfs)
+          val fs = FileSystem.get(uri, hadoopConfiguration)
+          val base = history_hdfs.stripSuffix("/")
+          val filter = new PathFilter() {
+            override def accept(file: Path): Boolean = {
+              file.getName().startsWith(appId)
+            }
+          }
+          // hdfs fs -ls
+          val attemptsList = fs.listStatus(new Path(base), filter)
+          // if find the event log file
+          if (attemptsList.nonEmpty) {
+            logger.info(s"Find Job in ${history_hdfs} ")
+            return (FileSystem.get(uri, hadoopConfiguration), new Path(uri.getPath))
+          }
+        }
+        // using first hdfs url as default
+        logger.info(s"Not find Job ,using first location as default ${default_uri} ")
+         (FileSystem.get(default_uri, hadoopConfiguration), new Path(default_uri.getPath))
+      }
+      else {
+        val uri = new URI(uriFromFetcherConf.get)
+        (FileSystem.get(uri, hadoopConfiguration), new Path(uri.getPath))
+      }
     } else {
       val eventLogUri = sparkConf.getOption(SPARK_EVENT_LOG_DIR_KEY).map(new URI(_))
       eventLogUri match {
@@ -276,7 +302,8 @@ trait SparkUtils {
 
       // This should be reached only if we can't parse the filename in the path.
       // Try to construct a general path in that case.
-      case _ => (new Path(base + "/" + appId + "." + DEFAULT_COMPRESSION_CODEC), DEFAULT_COMPRESSION_CODEC)
+      // case _ => (new Path(base + "/" + appId + "." + DEFAULT_COMPRESSION_CODEC), DEFAULT_COMPRESSION_CODEC)
+      case _ => (new Path(base + "/" + appId ), "")
     }
   }
 

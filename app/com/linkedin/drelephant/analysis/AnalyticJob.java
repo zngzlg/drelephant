@@ -19,13 +19,13 @@ package com.linkedin.drelephant.analysis;
 import com.linkedin.drelephant.ElephantContext;
 import com.linkedin.drelephant.util.InfoExtractor;
 import com.linkedin.drelephant.util.Utils;
+import models.AppHeuristicResult;
+import models.AppResult;
+import org.apache.log4j.Logger;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import models.AppHeuristicResult;
-import models.AppHeuristicResultDetails;
-import models.AppResult;
-import org.apache.log4j.Logger;
 
 
 /**
@@ -54,6 +54,7 @@ public class AnalyticJob {
   private int _timeLeftToRetry;
   private int _retries = 0;
   private int _secondRetries = 0;
+  private String _ftime = "0000000000";
   private ApplicationType _type;
   private String _appId;
   private String _name;
@@ -83,7 +84,16 @@ public class AnalyticJob {
     _type = type;
     return this;
   }
-
+  /**
+   * Set the ftime  of this job.
+   *
+   * @param ftime The finish time,format YYYYMMDDHH
+   * @return The analytic job
+   */
+  public AnalyticJob setFtime(String ftime) {
+    _ftime = ftime;
+    return this;
+  }
   /**
    * Set the application id of this job
    *
@@ -283,6 +293,7 @@ public class AnalyticJob {
     result.username = Utils.truncateField(getUser(), AppResult.USERNAME_LIMIT, getAppId());
     result.startTime = getStartTime();
     result.finishTime = getFinishTime();
+    result.ftime = Long.parseLong(_ftime);
     result.name = Utils.truncateField(getName(), AppResult.APP_NAME_LIMIT, getAppId());
     result.jobType = Utils.truncateField(jobTypeName, AppResult.JOBTYPE_LIMIT, getAppId());
     result.resourceUsed = hadoopAggregatedData.getResourceUsed();
@@ -294,31 +305,28 @@ public class AnalyticJob {
     result.yarnAppHeuristicResults = new ArrayList<AppHeuristicResult>();
     Severity worstSeverity = Severity.NONE;
     for (HeuristicResult heuristicResult : analysisResults) {
-      AppHeuristicResult detail = new AppHeuristicResult();
-      detail.heuristicClass = Utils.truncateField(heuristicResult.getHeuristicClassName(),
-          AppHeuristicResult.HEURISTIC_CLASS_LIMIT, getAppId());
-      detail.heuristicName = Utils.truncateField(heuristicResult.getHeuristicName(),
-          AppHeuristicResult.HEURISTIC_NAME_LIMIT, getAppId());
-      detail.severity = heuristicResult.getSeverity();
-      detail.score = heuristicResult.getScore();
-
-      // Load Heuristic Details
       for (HeuristicResultDetails heuristicResultDetails : heuristicResult.getHeuristicResultDetails()) {
-        AppHeuristicResultDetails heuristicDetail = new AppHeuristicResultDetails();
-        heuristicDetail.yarnAppHeuristicResult = detail;
-        heuristicDetail.name = Utils.truncateField(heuristicResultDetails.getName(),
-            AppHeuristicResultDetails.NAME_LIMIT, getAppId());
-        heuristicDetail.value = Utils.truncateField(heuristicResultDetails.getValue(),
-            AppHeuristicResultDetails.VALUE_LIMIT, getAppId());
-        heuristicDetail.details = Utils.truncateField(heuristicResultDetails.getDetails(),
-            AppHeuristicResultDetails.DETAILS_LIMIT, getAppId());
-        // This was added for AnalyticTest. Commenting this out to fix a bug. Also disabling AnalyticJobTest.
-        //detail.yarnAppHeuristicResultDetails = new ArrayList<AppHeuristicResultDetails>();
-        detail.yarnAppHeuristicResultDetails.add(heuristicDetail);
+        AppHeuristicResult detail = new AppHeuristicResult();
+        detail.ftime = result.ftime;
+        detail.heuristicClass = Utils.truncateField(heuristicResult.getHeuristicClassName(),
+            AppHeuristicResult.HEURISTIC_CLASS_LIMIT, getAppId());
+        detail.heuristicName = Utils.truncateField(heuristicResult.getHeuristicName(),
+            AppHeuristicResult.HEURISTIC_NAME_LIMIT, getAppId());
+        detail.severity = heuristicResult.getSeverity();
+        detail.score = heuristicResult.getScore();
+
+        // Load Heuristic Details
+        detail.name = Utils.truncateField(heuristicResultDetails.getName(),
+                AppHeuristicResult.NAME_LIMIT, getAppId());
+        detail.value = Utils.truncateField(heuristicResultDetails.getValue(),
+                AppHeuristicResult.VALUE_LIMIT, getAppId());
+        detail.details = Utils.truncateField(heuristicResultDetails.getDetails(),
+                AppHeuristicResult.DETAILS_LIMIT, getAppId());
+
+        result.yarnAppHeuristicResults.add(detail);
+        worstSeverity = Severity.max(worstSeverity, detail.severity);
+        jobScore += detail.score;
       }
-      result.yarnAppHeuristicResults.add(detail);
-      worstSeverity = Severity.max(worstSeverity, detail.severity);
-      jobScore += detail.score;
     }
     result.severity = worstSeverity;
     result.score = jobScore;

@@ -118,19 +118,15 @@
                 @if(yarnAppHeuristicResult.severity.getValue > 1){ <a href="@routes.Application.oldHelp()?topic=@helper.urlEncode(yarnAppHeuristicResult.heuristicName)">[Explain]</a> }
               </th>
             </tr></thead>
-            <tbody>
-              @for(yarnAppHeuristicResultDetail <- yarnAppHeuristicResult.yarnAppHeuristicResultDetails) {
                 <tr>
-                  <td>@yarnAppHeuristicResultDetail.name</td>
-                  <td>@yarnAppHeuristicResultDetail.value</td>
+                  <td>@yarnAppHeuristicResult.name</td>
+                  <td>@yarnAppHeuristicResult.value</td>
                 </tr>
-                @if(yarnAppHeuristicResultDetail.details != null) {
+                @if(yarnAppHeuristicResult.details != null) {
                   <tr>
-                    <td colspan="2"><div class="stacktrace">@yarnAppHeuristicResultDetail.details</div></td>
+                    <td colspan="2"><div class="stacktrace">@yarnAppHeuristicResult.details</div></td>
                   </tr>
                 }
-              }
-            </tbody>
           </table>
         </a>
       }
