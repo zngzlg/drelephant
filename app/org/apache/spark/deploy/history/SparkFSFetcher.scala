@@ -63,8 +63,12 @@ class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends Elephant
 
   def fetchData(analyticJob: AnalyticJob): SparkApplicationData = {
     val appId = analyticJob.getAppId()
-    doAsPrivilegedAction { () =>  doFetchData(appId)
+    val applicationData = doAsPrivilegedAction { () => doFetchData(appId)
     }
+    // use usp.param instead of name, tdw.username instead of user
+    analyticJob.setName(applicationData.getConf().getProperty("usp.param", analyticJob.getName))
+    analyticJob.setName(applicationData.getConf().getProperty("tdw.username", analyticJob.getName))
+    applicationData
   }
 
   protected def doAsPrivilegedAction[T](action: () => T): T =

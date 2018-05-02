@@ -58,6 +58,21 @@ object Dependencies {
       )
   }
 
+  val sparkSQLExclusion = if (sparkVersion >= "1.5.0") {
+    "org.apache.spark" % "spark-sql_2.10" % sparkVersion excludeAll(
+      ExclusionRule(organization = "com.typesafe.akka"),
+      ExclusionRule(organization = "org.apache.avro"),
+      ExclusionRule(organization = "org.apache.hadoop"),
+      ExclusionRule(organization = "net.razorvine")
+    )
+  } else {
+    "org.apache.spark" % "spark-sql_2.10" % sparkVersion excludeAll(
+      ExclusionRule(organization = "org.apache.avro"),
+      ExclusionRule(organization = "org.apache.hadoop"),
+      ExclusionRule(organization = "net.razorvine")
+    )
+  }
+
   // Dependency coordinates
   var requiredDep = Seq(
     "com.google.code.gson" % "gson" % gsonVersion,
@@ -95,13 +110,16 @@ object Dependencies {
     "org.scalatest" %% "scalatest" % "3.0.0" % Test, 
     "com.h2database" % "h2" % "1.4.196" % Test
 
-  ) :+ sparkExclusion
+  ) :+ sparkExclusion :+ sparkSQLExclusion
 
   var dependencies = Seq(javaJdbc, javaEbean, cache)
   dependencies ++= requiredDep
 
   val exclusionRules = Seq(
     ExclusionRule(organization = "com.sun.jersey", name = "jersey-core"),
-    ExclusionRule(organization = "com.sun.jersey", name = "jersey-server")
+    ExclusionRule(organization = "com.sun.jersey", name = "jersey-server"),
+    ExclusionRule(organization = "org.slf4j", name = "slf4j-simple"),
+    ExclusionRule(organization = "ch.qos.logback", name = "logback-classic"),
+    ExclusionRule(organization = "log4j", name = "log4j ")
   )
 }

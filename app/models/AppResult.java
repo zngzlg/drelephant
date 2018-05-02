@@ -33,7 +33,7 @@ public class AppResult extends Model {
 
   public static final int ID_LIMIT = 50;
   public static final int USERNAME_LIMIT = 50;
-  public static final int QUEUE_NAME_LIMIT = 50;
+  public static final int QUEUE_NAME_LIMIT = 255;
   public static final int APP_NAME_LIMIT = 100;
   public static final int JOB_NAME_LIMIT = 255;
   public static final int TRACKING_URL_LIMIT = 255;

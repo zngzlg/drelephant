@@ -79,8 +79,12 @@ class SparkSQLFetcher(fetcherConfData: FetcherConfigurationData) extends Elephan
       timestamp.get(Calendar.HOUR_OF_DAY):Integer)
     logger.info(String.format("job finish time is %s", datePart))
 
-    doAsPrivilegedAction { () =>  doFetchData(appId, datePart)
+    val applicationData = doAsPrivilegedAction { () =>  doFetchData(appId, datePart)
     }
+    // use usp.param instead of name, tdw.username instead of user
+    analyticJob.setName(applicationData.getConf().getProperty("usp.param", analyticJob.getName))
+    analyticJob.setName(applicationData.getConf().getProperty("tdw.username", analyticJob.getName))
+    applicationData
   }
 
   protected def doAsPrivilegedAction[T](action: () => T): T =

@@ -175,6 +175,10 @@ public class MapReduceTDWFetcherHadoop2 extends MapReduceFetcher {
         }
         jobData.setJobConf(jobConfProperties);
 
+        // use usp.param instead of name, tdw.username instead of user
+        job.setName(jobConfProperties.getProperty("usp.param",job.getName()));
+        job.setUser(jobConfProperties.getProperty("tdw.username",job.getUser()));
+
         // Check if job history file is too large and should be throttled
         if (_fs.getFileStatus(new Path(histFile)).getLen() > _maxLogSizeInMB * FileUtils.ONE_MB) {
             String errMsg = "The history log of MapReduce application: " + appId + " is over the limit size of "
