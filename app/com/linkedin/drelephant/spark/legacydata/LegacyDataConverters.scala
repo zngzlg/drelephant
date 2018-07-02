@@ -20,10 +20,10 @@ import java.util.Date
 
 import scala.collection.JavaConverters
 import scala.util.Try
-
 import com.linkedin.drelephant.spark.fetchers.statusapiv1._
 import org.apache.spark.JobExecutionStatus
 import com.linkedin.drelephant.spark.fetchers.statusapiv1.StageStatus
+import org.apache.log4j.Logger
 
 /**
   * Converters for legacy SparkApplicationData to current SparkApplicationData.
@@ -33,7 +33,7 @@ import com.linkedin.drelephant.spark.fetchers.statusapiv1.StageStatus
   */
 object LegacyDataConverters {
   import JavaConverters._
-
+  private val trace = Logger.getLogger("TRACE")
   def convert(legacyData: SparkApplicationData): com.linkedin.drelephant.spark.data.SparkApplicationData = {
     com.linkedin.drelephant.spark.data.SparkApplicationData(
       legacyData.getAppId,

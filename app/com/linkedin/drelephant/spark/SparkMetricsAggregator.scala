@@ -46,7 +46,6 @@ class SparkMetricsAggregator(private val aggregatorConfigurationData: Aggregator
 
   override def aggregate(data: HadoopApplicationData): Unit = data match {
     case (data: SparkApplicationData) => {
-      trace.info(s"${data.appId} is spark application data.")
       aggregate(data)
     }
     case _ => throw new IllegalArgumentException("data should be SparkApplicationData")
@@ -55,9 +54,7 @@ class SparkMetricsAggregator(private val aggregatorConfigurationData: Aggregator
   private def aggregate(data: SparkApplicationData): Unit = {
     val executorInstances = executorInstancesOf(data)
     val executorMemoryBytes: Long = executorMemoryBytesOf(data).getOrElse(1024 * 1024 * 1024)
-    trace.info(s"${data.appId} executor memory is ${executorMemoryBytes}")
     val applicationDurationMillis = applicationDurationMillisOf(data)
-    trace.info(s"${data.appId} duration millis is ${applicationDurationMillis}")
     if (applicationDurationMillis < 0) {
       trace.warn(s"applicationDurationMillis is negative. Skipping Metrics Aggregation:${applicationDurationMillis}")
     } else {
@@ -67,13 +64,12 @@ class SparkMetricsAggregator(private val aggregatorConfigurationData: Aggregator
       val resourcesAllocatedForUse = executorDynamicAllocatedForUse(data)
       trace.info(s"${data.appId} resourcesAllocatedForUse: ${resourcesAllocatedForUse}")
       // val resourcesActuallyUsed = aggregateresourcesActuallyUsed(executorMemoryBytes, totalExecutorTaskTimeMillis)
-      val resourcesActuallyUsed = executorDynamicActualUsed(data, executorMemoryBytes)
-      trace.info(s"${data.appId} resourcesActuallyUsed: ${resourcesAllocatedForUse}")
+      val resourceActuallyUsed = executorDynamicActualUsed(data)
+      trace.info(s"${data.appId} resourceActuallyUsed: ${resourceActuallyUsed}")
+      val resourcesWasted = executorDynamicWasted(data)
+      trace.info(s"${data.appId} resourcesWasted: ${resourcesWasted}")
       // val resourcesActuallyUsedWithBuffer = resourcesActuallyUsed.doubleValue() * (1.0 + allocatedMemoryWasteBufferPercentage)
-      val resourcesWastedMBSeconds = (resourcesActuallyUsed.doubleValue() < resourcesAllocatedForUse.doubleValue()) match {
-        case true => resourcesAllocatedForUse.doubleValue() - resourcesActuallyUsed.doubleValue()
-        case false => 0.0
-      }
+      val resourcesWastedMBSeconds = resourcesWasted.doubleValue()
       //allocated is the total used resource from the cluster.
       if (resourcesAllocatedForUse.isValidLong) {
         hadoopAggregatedData.setResourceUsed(resourcesAllocatedForUse.toLong)
@@ -84,7 +80,6 @@ class SparkMetricsAggregator(private val aggregatorConfigurationData: Aggregator
         logger.warn(s"executorMemoryBytes:${executorMemoryBytes}")
         logger.warn(s"applicationDurationMillis:${applicationDurationMillis}")
         logger.warn(s"totalExecutorTaskTimeMillis:${totalExecutorTaskTimeMillis}")
-        logger.warn(s"resourcesActuallyUsedWithBuffer:${resourcesActuallyUsed}")
         logger.warn(s"resourcesWastedMBSeconds:${resourcesWastedMBSeconds}")
         logger.warn(s"allocatedMemoryWasteBufferPercentage:${allocatedMemoryWasteBufferPercentage}")
       }
@@ -107,11 +102,15 @@ class SparkMetricsAggregator(private val aggregatorConfigurationData: Aggregator
   }
 
   private def executorDynamicAllocatedForUse(data: SparkApplicationData): BigInt = {
-    data.executorSummaries.map(l => BigInt(l.maxMemory) * BigInt(l.totalDuration / 1000)).sum / (BigInt(FileUtils.ONE_MB) * BigInt(Statistics.SECOND_IN_MS))
+    data.executorSummaries.map(l => BigInt(l.maxMemory * 10 / 6) * BigInt(l.totalDuration)).sum / (BigInt(FileUtils.ONE_MB) * BigInt(Statistics.SECOND_IN_MS))
   }
 
-  private def executorDynamicActualUsed(data: SparkApplicationData, executorMemoryBytes: Long): BigInt = {
-    data.stageDatas.map(l => BigInt(l.executorRunTime) * BigInt(executorMemoryBytes)).sum / (BigInt(FileUtils.ONE_MB) * BigInt(Statistics.SECOND_IN_MS))
+  private def executorDynamicActualUsed(data: SparkApplicationData):BigInt = {
+    data.executorSummaries.map(l => BigInt(l.memoryUsed) * BigInt(l.totalDuration)).sum / (BigInt(FileUtils.ONE_MB) * BigInt(Statistics.SECOND_IN_MS))
+  }
+  // storage 浪费量
+  private def executorDynamicWasted(data: SparkApplicationData): BigInt = {
+    data.executorSummaries.map(l => (BigInt(l.maxMemory) - BigInt(l.memoryUsed)) * 10 / 6 * BigInt(l.totalDuration)).sum / (BigInt(FileUtils.ONE_MB) * BigInt(Statistics.SECOND_IN_MS))
   }
 
   private def executorInstancesOf(data: SparkApplicationData): Option[Int] = {

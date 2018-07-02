@@ -18,9 +18,9 @@ package org.apache.spark.storage
 
 
 import scala.collection.mutable
-
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.scheduler._
+import org.apache.spark.sql.execution.ui.{SparkListenerDriverAccumUpdates, SparkListenerSQLExecutionEnd, SparkListenerSQLExecutionStart}
 
 
 /**
@@ -61,6 +61,19 @@ class StorageStatusTrackingListener extends SparkListener {
       }
     }
     updateUsedMem()
+  }
+
+  def onExecutionStart(e: SparkListenerSQLExecutionStart): Unit = ???
+
+  def onExecutionEnd(e: SparkListenerSQLExecutionEnd): Unit = ???
+
+  def onDriverAccumUpdates(e: SparkListenerDriverAccumUpdates): Unit = ???
+
+  override def onOtherEvent(event: SparkListenerEvent): Unit = event match {
+    case e: SparkListenerSQLExecutionStart => onExecutionStart(e)
+    case e: SparkListenerSQLExecutionEnd => onExecutionEnd(e)
+    case e: SparkListenerDriverAccumUpdates => onDriverAccumUpdates(e)
+    case _ => // Ignore
   }
 
   private def updateUsedMem(): Unit = {

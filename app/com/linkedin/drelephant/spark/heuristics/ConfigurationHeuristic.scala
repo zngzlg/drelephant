@@ -17,13 +17,14 @@
 package com.linkedin.drelephant.spark.heuristics
 
 import java.util.ArrayList
-import scala.collection.JavaConverters
-import scala.util.Try
+
 import com.linkedin.drelephant.analysis._
 import com.linkedin.drelephant.configurations.heuristic.HeuristicConfigurationData
 import com.linkedin.drelephant.spark.data.SparkApplicationData
 import com.linkedin.drelephant.util.MemoryFormatUtils
-import com.linkedin.drelephant.math.Statistics
+
+import scala.collection.JavaConverters
+import scala.util.Try
 
 /**
   * A heuristic based on an app's known configuration.
@@ -37,6 +38,7 @@ class ConfigurationHeuristic(private val heuristicConfigurationData: HeuristicCo
   extends Heuristic[SparkApplicationData] {
 
   import ConfigurationHeuristic._
+
   import JavaConverters._
 
   val sparkOverheadMemoryThreshold: SeverityThresholds = SeverityThresholds.parse(heuristicConfigurationData.getParamMap.get(SPARK_OVERHEAD_MEMORY_THRESHOLD_KEY), ascending = true)
@@ -118,10 +120,10 @@ class ConfigurationHeuristic(private val heuristicConfigurationData: HeuristicCo
     if (evaluator.jarsSeverity == Severity.CRITICAL) {
       result.addResultDetail("Jars notation", "It is recommended to not use * notation while specifying jars in the field " + SPARK_YARN_JARS)
     }
-    if(evaluator.severityDriverMemoryOverhead.getValue >= Severity.SEVERE.getValue) {
+    if (evaluator.severityDriverMemoryOverhead.getValue >= Severity.SEVERE.getValue) {
       result.addResultDetail("Driver Overhead Memory", "Please do not specify excessive amount of overhead memory for Driver. Change it in the field " + SPARK_YARN_DRIVER_MEMORY_OVERHEAD)
     }
-    if(evaluator.severityExecutorMemoryOverhead.getValue >= Severity.SEVERE.getValue) {
+    if (evaluator.severityExecutorMemoryOverhead.getValue >= Severity.SEVERE.getValue) {
       result.addResultDetail("Executor Overhead Memory", "Please do not specify excessive amount of overhead memory for Executors. Change it in the field " + SPARK_YARN_EXECUTOR_MEMORY_OVERHEAD)
     }
     result
@@ -149,7 +151,7 @@ object ConfigurationHeuristic {
   val SPARK_YARN_EXECUTOR_MEMORY_OVERHEAD = "spark.yarn.executor.memoryOverhead"
   val SPARK_YARN_DRIVER_MEMORY_OVERHEAD = "spark.yarn.driver.memoryOverhead"
   val THRESHOLD_MIN_EXECUTORS: Int = 1
-  val THRESHOLD_MAX_EXECUTORS: Int = 900
+  val THRESHOLD_MAX_EXECUTORS: Int = 9000
   val SPARK_OVERHEAD_MEMORY_THRESHOLD_KEY = "spark.overheadMemory.thresholds.key"
   val DEFAULT_SPARK_OVERHEAD_MEMORY_THRESHOLDS =
     SeverityThresholds(low = MemoryFormatUtils.stringToBytes("2G"), MemoryFormatUtils.stringToBytes("4G"),
@@ -183,16 +185,28 @@ object ConfigurationHeuristic {
     lazy val applicationDuration: Long = {
       require(data.applicationInfo.attempts.nonEmpty)
       val lastApplicationAttemptInfo = data.applicationInfo.attempts.last
-      (lastApplicationAttemptInfo.endTime.getTime - lastApplicationAttemptInfo.startTime.getTime) / Statistics.SECOND_IN_MS
+      lastApplicationAttemptInfo.endTime.getTime - lastApplicationAttemptInfo.startTime.getTime
+    }
+    lazy val applicationStartTime: Long = {
+
+      require(data.applicationInfo.attempts.nonEmpty)
+      val lastApplicationAttemptInfo = data.applicationInfo.attempts.last
+      lastApplicationAttemptInfo.startTime.getTime
+    }
+
+    lazy val applicationEngTime: Long = {
+      require(data.applicationInfo.attempts.nonEmpty)
+      val lastApplicationAttemptInfo = data.applicationInfo.attempts.last
+      lastApplicationAttemptInfo.endTime.getTime
     }
 
     lazy val sparkYarnJars: String = getProperty(SPARK_YARN_JARS).getOrElse("")
 
     lazy val jarsSeverity: Severity = if (sparkYarnJars.contains("*")) {
-        Severity.CRITICAL
-      } else {
-        Severity.NONE
-      }
+      Severity.CRITICAL
+    } else {
+      Severity.NONE
+    }
 
     lazy val sparkYarnExecutorMemoryOverhead: String = if (getProperty(SPARK_YARN_EXECUTOR_MEMORY_OVERHEAD).getOrElse("0").matches("(.*)[0-9]"))
       MemoryFormatUtils.bytesToString(MemoryFormatUtils.stringToBytes(getProperty(SPARK_YARN_EXECUTOR_MEMORY_OVERHEAD).getOrElse("0") + "MB")) else (getProperty(SPARK_YARN_EXECUTOR_MEMORY_OVERHEAD).getOrElse("0"))
@@ -241,10 +255,10 @@ object ConfigurationHeuristic {
       severityMinExecutors, severityMaxExecutors, jarsSeverity, severityExecutorMemoryOverhead, severityDriverMemoryOverhead)
 
     /**
-     * The following logic computes severity based on shuffle service and dynamic allocation flags.
-     * If dynamic allocation is disabled, then the severity will be MODERATE if shuffle service is disabled or not specified.
-     * If dynamic allocation is enabled, then the severity will be SEVERE if shuffle service is disabled or not specified.
-     */
+      * The following logic computes severity based on shuffle service and dynamic allocation flags.
+      * If dynamic allocation is disabled, then the severity will be MODERATE if shuffle service is disabled or not specified.
+      * If dynamic allocation is enabled, then the severity will be SEVERE if shuffle service is disabled or not specified.
+      */
 
     lazy val isDynamicAllocationEnabled: Option[Boolean] = Some(getProperty(SPARK_DYNAMIC_ALLOCATION_ENABLED).exists(_.toBoolean == true))
     lazy val isShuffleServiceEnabled: Option[Boolean] = Some(getProperty(SPARK_SHUFFLE_SERVICE_ENABLED).exists(_.toBoolean == true))

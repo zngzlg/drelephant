@@ -66,8 +66,8 @@ class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends Elephant
     val applicationData = doAsPrivilegedAction { () => doFetchData(appId)
     }
     // use usp.param instead of name, tdw.username instead of user
-    analyticJob.setName(applicationData.getConf().getProperty("usp.param", analyticJob.getName))
-    analyticJob.setName(applicationData.getConf().getProperty("tdw.username", analyticJob.getName))
+    analyticJob.setName(applicationData.getConf().getProperty("spark.hadoop.usp.param", applicationData.getConf().getProperty("usp.param",analyticJob.getName)))
+    analyticJob.setUser(applicationData.getConf().getProperty("spark.submitter", applicationData.getConf().getProperty("tdw.username", analyticJob.getName)))
     applicationData
   }
 
@@ -102,8 +102,15 @@ class SparkFSFetcher(fetcherConfData: FetcherConfigurationData) extends Elephant
                           " with codec:" + eventLogCodec)
       //if event log file corrupt ,then logging instead retry.
       try {
-        sparkUtils.withEventLog(eventLogFileSystem, eventLogPath, eventLogCodec) { in =>
-          dataCollection.load(in, eventLogPath.toString())
+        if (eventLogCodec.isDefined) {
+          sparkUtils.withEventLog(eventLogFileSystem, eventLogPath, eventLogCodec) { in =>
+            dataCollection.load(in, eventLogPath.toString)
+          }
+        }
+        else{
+          sparkUtils.withEventLog(eventLogFileSystem, eventLogPath, None) { in =>
+            dataCollection.load(in, eventLogPath.toString)
+          }
         }
       }
       catch {

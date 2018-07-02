@@ -111,6 +111,10 @@ class ExecutorsHeuristic(private val heuristicConfigurationData: HeuristicConfig
       new HeuristicResultDetails(
         "Executor shuffle write bytes distribution",
         formatDistributionBytes(evaluator.shuffleWriteBytesDistribution)
+      ),
+      new HeuristicResultDetails(
+        "Executor total input bytes",
+        evaluator.totalInputBytes.toString
       )
     )
     val result = new HeuristicResult(
@@ -171,6 +175,8 @@ object ExecutorsHeuristic {
 
     lazy val inputBytesDistribution: Distribution =
       Distribution(executorSummaries.map { _.totalInputBytes })
+
+    lazy val totalInputBytes :Long = executorSummaries.map(_.totalInputBytes).sum
 
     lazy val inputBytesSeverity: Severity =
       severityOfDistribution(inputBytesDistribution, ignoreMaxBytesLessThanThreshold)

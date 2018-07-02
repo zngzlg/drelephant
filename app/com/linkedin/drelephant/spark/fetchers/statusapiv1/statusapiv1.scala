@@ -39,11 +39,9 @@ package com.linkedin.drelephant.spark.fetchers.statusapiv1
 
 import java.util.Date
 
-import scala.collection.Map
-
 import org.apache.spark.JobExecutionStatus
-import com.fasterxml.jackson.annotation.JsonSubTypes.Type
-import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
+
+import scala.collection.Map
 
 trait ApplicationInfo {
   def id: String
@@ -418,7 +416,6 @@ class ShuffleWriteMetricsImpl(
 
 class TaskMetricDistributionsImpl(
   var quantiles: IndexedSeq[Double],
-
   var executorDeserializeTime: IndexedSeq[Double],
   var executorRunTime: IndexedSeq[Double],
   var resultSize: IndexedSeq[Double],

@@ -159,19 +159,19 @@ public class AnalyticJobGeneratorTDW implements AnalyticJobGenerator {
             // When called first time after launch, hit the DB and avoid duplicated analytic jobs that have been analyzed
             // before.
             // if (AppResult.find.byId(appId) == null) {
-            String user = app.get("user").getTextValue();
+            String user = app.get("current_user").getTextValue();
             String name = app.get("name").getTextValue();
             String[] queueSplits = app.get("queue").getTextValue().split("[.]");
             String queueName = queueSplits[queueSplits.length-1];
-            String trackingUrl = app.get("trackingUrl") != null ? app.get("trackingUrl").getTextValue() : null;
-            long startTime = app.get("startedTime").getLongValue();
-            long finishTime = app.get("finishedTime").getLongValue();
+            String trackingUrl = app.get("trackingurl") != null ? app.get("trackingurl").getTextValue() : null;
+            long startTime = app.get("startedtime").getLongValue();
+            long finishTime = app.get("finishedtime").getLongValue();
             Timestamp ts = new Timestamp(finishTime);
             DateFormat sdf = new SimpleDateFormat("yyyyMMddHH");
             String ftime = sdf.format(ts);
             trace.info(String.format("tracing %s at %s", appId, ts));
             ApplicationType type =
-                    ElephantContext.instance().getApplicationTypeForName(app.get("applicationType").getTextValue());
+                    ElephantContext.instance().getApplicationTypeForName(app.get("applicationtype").getTextValue());
             // If the application type is supported
             if (type != null) {
                 AnalyticJob analyticJob = new AnalyticJob();

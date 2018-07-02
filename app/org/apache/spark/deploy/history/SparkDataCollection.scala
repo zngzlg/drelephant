@@ -17,15 +17,12 @@
 package org.apache.spark.deploy.history
 
 import java.io.InputStream
-import java.util.{Set => JSet, Properties, List => JList, HashSet => JHashSet, ArrayList => JArrayList}
-
-import scala.collection.mutable
+import java.util.{Properties, ArrayList => JArrayList, HashSet => JHashSet, List => JList, Set => JSet}
 
 import com.linkedin.drelephant.analysis.ApplicationType
-import com.linkedin.drelephant.spark.legacydata._
 import com.linkedin.drelephant.spark.legacydata.SparkExecutorData.ExecutorInfo
 import com.linkedin.drelephant.spark.legacydata.SparkJobProgressData.JobInfo
-
+import com.linkedin.drelephant.spark.legacydata._
 import org.apache.spark.SparkConf
 import org.apache.spark.scheduler.{ApplicationEventListener, ReplayListenerBus, StageInfo}
 import org.apache.spark.storage.{RDDInfo, StorageStatus, StorageStatusListener, StorageStatusTrackingListener}
@@ -34,6 +31,8 @@ import org.apache.spark.ui.exec.ExecutorsListener
 import org.apache.spark.ui.jobs.JobProgressListener
 import org.apache.spark.ui.storage.StorageListener
 import org.apache.spark.util.collection.OpenHashSet
+
+import scala.collection.mutable
 
 /**
  * This class wraps the logic of collecting the data in SparkEventListeners into the
@@ -46,23 +45,29 @@ import org.apache.spark.util.collection.OpenHashSet
 class SparkDataCollection extends SparkApplicationData {
   import SparkDataCollection._
 
+  val _conf = new SparkConf()
+  // 获取10000个dead executor metrics
+  _conf.set("spark.ui.retainedDeadExecutors","10000")
+  // 最大能获取10000个 executor metrics
+  _conf.set("spark.ui.timeline.executors.maximum","10000")
+
   lazy val applicationEventListener = new ApplicationEventListener()
-  lazy val jobProgressListener = new JobProgressListener(new SparkConf())
+  lazy val jobProgressListener = new JobProgressListener(_conf)
   lazy val environmentListener = new EnvironmentListener()
-  lazy val storageStatusListener = new StorageStatusListener(new SparkConf())
-  lazy val executorsListener = new ExecutorsListener(storageStatusListener,new SparkConf())
+  lazy val storageStatusListener = new StorageStatusListener(_conf)
+  lazy val executorsListener = new ExecutorsListener(storageStatusListener,_conf)
   lazy val storageListener = new StorageListener(storageStatusListener)
 
   // This is a customized listener that tracks peak used memory
   // The original listener only tracks the current in use memory which is useless in offline scenario.
   lazy val storageStatusTrackingListener = new StorageStatusTrackingListener()
 
-  private var _applicationData: SparkGeneralData = null;
-  private var _jobProgressData: SparkJobProgressData = null;
-  private var _environmentData: SparkEnvironmentData = null;
-  private var _executorData: SparkExecutorData = null;
-  private var _storageData: SparkStorageData = null;
-  private var _isThrottled: Boolean = false;
+  private var _applicationData: SparkGeneralData = _
+  private var _jobProgressData: SparkJobProgressData = _
+  private var _environmentData: SparkEnvironmentData = _
+  private var _executorData: SparkExecutorData = _
+  private var _storageData: SparkStorageData = _
+  private var _isThrottled: Boolean = false
 
   def throttle(): Unit = {
     _isThrottled = true
@@ -144,6 +149,7 @@ class SparkDataCollection extends SparkApplicationData {
       }
     }
     _applicationData
+
   }
 
   override def getEnvironmentData(): SparkEnvironmentData = {
@@ -163,10 +169,10 @@ class SparkDataCollection extends SparkApplicationData {
   override def getExecutorData(): SparkExecutorData = {
     if (_executorData == null) {
       _executorData = new SparkExecutorData()
-      for (statusId <- executorsListener.activeStorageStatusList.indices) {
+      for (status <- executorsListener.activeStorageStatusList) {
         val info = new ExecutorInfo()
 
-        val status = executorsListener.activeStorageStatusList(statusId)
+        // val status = executorsListener.activeStorageStatusList(statusId)
 
         info.execId = status.blockManagerId.executorId
         info.hostPort = status.blockManagerId.hostPort
@@ -185,7 +191,31 @@ class SparkDataCollection extends SparkApplicationData {
         info.inputBytes = executorsListener.executorToTaskSummary(eid).inputBytes
         info.shuffleRead = executorsListener.executorToTaskSummary(eid).shuffleRead
         info.shuffleWrite = executorsListener.executorToTaskSummary(eid).shuffleWrite
+        info.totalGCTime = executorsListener.executorToTaskSummary(eid).jvmGCTime
+        _executorData.setExecutorInfo(info.execId, info)
+      }
 
+      for (status <-  executorsListener.deadStorageStatusList) {
+
+        val info = new ExecutorInfo()
+        info.execId = status.blockManagerId.executorId
+        info.hostPort = status.blockManagerId.hostPort
+        info.rddBlocks = status.numBlocks
+        val eid = info.execId
+        // Use a customized listener to fetch the peak memory used, the data contained in status are
+        // the current used memory that is not useful in offline settings.
+        info.memUsed = storageStatusTrackingListener.executorIdToMaxUsedMem.getOrElse(info.execId, 0L)
+        info.maxMem = status.maxMem
+        info.diskUsed = status.diskUsed
+        info.activeTasks = executorsListener.executorToTaskSummary(eid).tasksActive
+        info.failedTasks = executorsListener.executorToTaskSummary(eid).tasksFailed
+        info.completedTasks = executorsListener.executorToTaskSummary(eid).tasksComplete
+        info.totalTasks = info.activeTasks + info.failedTasks + info.completedTasks
+        info.duration = executorsListener.executorToTaskSummary(eid).duration
+        info.inputBytes = executorsListener.executorToTaskSummary(eid).inputBytes
+        info.shuffleRead = executorsListener.executorToTaskSummary(eid).shuffleRead
+        info.shuffleWrite = executorsListener.executorToTaskSummary(eid).shuffleWrite
+        info.totalGCTime = executorsListener.executorToTaskSummary(eid).jvmGCTime
         _executorData.setExecutorInfo(info.execId, info)
       }
     }
@@ -210,7 +240,6 @@ class SparkDataCollection extends SparkApplicationData {
         jobInfo.numSkippedStages = data.numSkippedStages
         jobInfo.numSkippedTasks = data.numSkippedTasks
         jobInfo.numTasks = data.numTasks
-
         jobInfo.startTime = data.submissionTime.getOrElse(0)
         jobInfo.endTime = data.completionTime.getOrElse(0)
 

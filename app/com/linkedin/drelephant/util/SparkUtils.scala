@@ -20,13 +20,14 @@ import java.io._
 import java.net.URI
 import java.util.Properties
 
-import scala.collection.JavaConverters
-import scala.collection.mutable.HashMap
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
+import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
 import org.apache.spark.io.{CompressionCodec, LZ4CompressionCodec, LZFCompressionCodec, SnappyCompressionCodec}
+
+import scala.collection.JavaConverters
+import scala.collection.mutable.HashMap
 
 
 trait SparkUtils {
@@ -146,7 +147,11 @@ trait SparkUtils {
       case None => {
         val (logPath, codecName) = getLogPathAndCodecName(fs, fs.getUri.resolve(basePath.toUri), appId)
 
-        (logPath, Some(compressionCodecMap.getOrElseUpdate(codecName, loadCompressionCodec(sparkConf, codecName))))
+        if (codecName != null) {
+          (logPath, Some(compressionCodecMap.getOrElseUpdate(codecName, loadCompressionCodec(sparkConf, codecName))))
+        }
+        else
+          (logPath, None)
       }
     }
 
@@ -250,7 +255,7 @@ trait SparkUtils {
     var extension: Option[String] = None
     var attempt: Option[String] = None
     var appId: Option[String] = None
-    val nameAndExtension = logPath.split('.')
+    val nameAndExtension = logPath.stripSuffix(IN_PROGRESS).split('.')
     if( nameAndExtension.length == 2 ) {
       extension = Some(nameAndExtension(1))
       val name = nameAndExtension(0)
@@ -261,6 +266,10 @@ trait SparkUtils {
       } else {
         appId = Some(name)
       }
+    }
+    else if (nameAndExtension.length == 1) {
+      extension=None
+      appId = Some(nameAndExtension(0))
     }
     (appId, attempt, extension)
   }
@@ -298,7 +307,7 @@ trait SparkUtils {
                                                                 "_" + sanitize(finalAttempt._2.get) +
                                                                 "." + finalAttempt._3.get), finalAttempt._3.get)
       // if codec is not available, but we found a file match with appId, use the actual file Path from the first match
-      case nocodec if nocodec._1 != None & nocodec._3 == None => (attemptsList(0).getPath(), DEFAULT_COMPRESSION_CODEC)
+      case nocodec if nocodec._1 != None & nocodec._3 == None => (attemptsList(0).getPath(), null)
 
       // This should be reached only if we can't parse the filename in the path.
       // Try to construct a general path in that case.
