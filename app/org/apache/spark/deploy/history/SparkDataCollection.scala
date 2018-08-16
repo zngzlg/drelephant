@@ -27,7 +27,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.scheduler.{ApplicationEventListener, ReplayListenerBus, StageInfo}
 import org.apache.spark.storage.{RDDInfo, StorageStatus, StorageStatusListener, StorageStatusTrackingListener}
 import org.apache.spark.ui.env.EnvironmentListener
-import org.apache.spark.ui.exec.ExecutorsListener
+import org.apache.spark.ui.exec.{ExecutorsListener, TDWListener}
 import org.apache.spark.ui.jobs.JobProgressListener
 import org.apache.spark.ui.storage.StorageListener
 import org.apache.spark.util.collection.OpenHashSet
@@ -57,6 +57,7 @@ class SparkDataCollection extends SparkApplicationData {
   lazy val storageStatusListener = new StorageStatusListener(_conf)
   lazy val executorsListener = new ExecutorsListener(storageStatusListener,_conf)
   lazy val storageListener = new StorageListener(storageStatusListener)
+  lazy val tdwListener = new TDWListener(_conf)    // TDW Listener, executor added time,remove time
 
   // This is a customized listener that tracks peak used memory
   // The original listener only tracks the current in use memory which is useless in offline scenario.
@@ -169,7 +170,8 @@ class SparkDataCollection extends SparkApplicationData {
   override def getExecutorData(): SparkExecutorData = {
     if (_executorData == null) {
       _executorData = new SparkExecutorData()
-      for (status <- executorsListener.activeStorageStatusList) {
+
+      for (status <- executorsListener.activeStorageStatusList.filter(p=>p.blockManagerId.executorId != "driver")) {
         val info = new ExecutorInfo()
 
         // val status = executorsListener.activeStorageStatusList(statusId)
@@ -178,6 +180,7 @@ class SparkDataCollection extends SparkApplicationData {
         info.hostPort = status.blockManagerId.hostPort
         info.rddBlocks = status.numBlocks
         val eid = info.execId
+
         // Use a customized listener to fetch the peak memory used, the data contained in status are
         // the current used memory that is not useful in offline settings.
         info.memUsed = storageStatusTrackingListener.executorIdToMaxUsedMem.getOrElse(info.execId, 0L)
@@ -192,10 +195,16 @@ class SparkDataCollection extends SparkApplicationData {
         info.shuffleRead = executorsListener.executorToTaskSummary(eid).shuffleRead
         info.shuffleWrite = executorsListener.executorToTaskSummary(eid).shuffleWrite
         info.totalGCTime = executorsListener.executorToTaskSummary(eid).jvmGCTime
+
+        // executor info extended
+        info.addedTime = tdwListener.executorToTaskSummary(eid).addedTime
+        info.removedTime = tdwListener.executorToTaskSummary(eid).removedTime
+        info.taskCPUTime = tdwListener.executorToTaskSummary(eid).executorCpuTime
+        info.taskRuntime = tdwListener.executorToTaskSummary(eid).executorRuntime
         _executorData.setExecutorInfo(info.execId, info)
       }
 
-      for (status <-  executorsListener.deadStorageStatusList) {
+      for (status <-  executorsListener.deadStorageStatusList.filter(p=>p.blockManagerId.executorId != "driver")) {
 
         val info = new ExecutorInfo()
         info.execId = status.blockManagerId.executorId
@@ -216,6 +225,12 @@ class SparkDataCollection extends SparkApplicationData {
         info.shuffleRead = executorsListener.executorToTaskSummary(eid).shuffleRead
         info.shuffleWrite = executorsListener.executorToTaskSummary(eid).shuffleWrite
         info.totalGCTime = executorsListener.executorToTaskSummary(eid).jvmGCTime
+
+        // executor info extended
+        info.addedTime = tdwListener.executorToTaskSummary(eid).addedTime
+        info.removedTime = tdwListener.executorToTaskSummary(eid).removedTime
+        info.taskCPUTime = tdwListener.executorToTaskSummary(eid).executorCpuTime
+        info.taskRuntime = tdwListener.executorToTaskSummary(eid).executorRuntime
         _executorData.setExecutorInfo(info.execId, info)
       }
     }
@@ -323,6 +338,7 @@ class SparkDataCollection extends SparkApplicationData {
     replayBus.addListener(executorsListener)
     replayBus.addListener(storageListener)
     replayBus.addListener(storageStatusTrackingListener)
+    replayBus.addListener(tdwListener)
     replayBus.replay(in, sourceName, maybeTruncated = false)
   }
 }
