@@ -220,6 +220,16 @@ public final class Statistics {
   }
 
   /**
+   * display bytes as MB
+   * @param value bytes
+   * @return
+   */
+  public static Double bytesToMB(long value){
+    double mb = 1024*1024;
+    return value/mb;
+  }
+
+  /**
    * Convert milliseconds to readable value
    *
    * @param milliseconds The number of milliseconds

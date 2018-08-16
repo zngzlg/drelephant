@@ -226,6 +226,9 @@ object ExecutorsHeuristic {
 
   object Distribution {
     def apply(values: Seq[Long]): Distribution = {
+      if (values.isEmpty){
+        return Distribution(0,0,0,0,0)
+      }
       val sortedValues = values.sorted
       val sortedValuesAsJava = sortedValues.map(Long.box).to[ArrayBuffer].asJava
       Distribution(

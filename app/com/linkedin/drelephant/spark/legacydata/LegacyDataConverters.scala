@@ -174,7 +174,11 @@ object LegacyDataConverters {
         executorInfo.shuffleWrite,
         executorInfo.maxMem,
         executorInfo.totalGCTime,
-        executorLogs = Map.empty
+        executorLogs = Map.empty,
+        executorInfo.addedTime,
+        executorInfo.removedTime,
+        executorInfo.taskCPUTime,
+        executorInfo.taskRuntime
       )
     }
 

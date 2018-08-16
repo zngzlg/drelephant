@@ -143,7 +143,7 @@ public class MapperTimeHeuristic implements Heuristic<MapReduceApplicationData> 
         _heuristicConfData.getHeuristicName(), severity, Utils.getHeuristicScore(severity, tasks.length));
 
     result.addResultDetail("Number of tasks", Integer.toString(tasks.length));
-    result.addResultDetail("Average task input size", FileUtils.byteCountToDisplaySize(averageSize));
+    result.addResultDetail("Average task input size", Double.toString(Statistics.bytesToMB(averageSize)));
     result.addResultDetail("Average task runtime", Statistics.readableTimespan(averageTimeMs));
     result.addResultDetail("Max task runtime", Statistics.readableTimespan(taskMaxMs));
     result.addResultDetail("Min task runtime", Statistics.readableTimespan(taskMinMs));

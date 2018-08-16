@@ -48,7 +48,8 @@ class ExecutorGcHeuristic(private val heuristicConfigurationData: HeuristicConfi
     var resultDetails = Seq(
       new HeuristicResultDetails("GC time to Executor Run time ratio", evaluator.ratio.toString),
       new HeuristicResultDetails("Total GC time", evaluator.jvmTime.toString),
-      new HeuristicResultDetails("Total Executor Runtime", evaluator.executorRunTimeTotal.toString)
+      new HeuristicResultDetails("Total Executor Runtime", evaluator.executorRunTimeTotal.toString),
+      new HeuristicResultDetails("Executor CPU time", evaluator.totalTaskCPUTime.toString)
     )
 
     //adding recommendations to the result, severityTimeA corresponds to the ascending severity calculation
@@ -91,6 +92,11 @@ object ExecutorGcHeuristic {
   class Evaluator(executorGcHeuristic: ExecutorGcHeuristic, data: SparkApplicationData) {
     lazy val executorAndDriverSummaries: Seq[ExecutorSummary] = data.executorSummaries
     lazy val executorSummaries: Seq[ExecutorSummary] = executorAndDriverSummaries.filterNot(_.id.equals("driver"))
+
+    lazy val executor_cores: Int = data.getConf().getProperty(SPARK_EXECUTOR_CORES,"1").toInt
+    lazy val totalTaskCPUTime: Long = data.executorSummaries.map(l=>l.taskCPUTime/1000000000).sum
+    lazy val totalTaskRunTime: Long = data.executorSummaries.map(l=>l.taskRunTime/1000).sum
+
     lazy val appConfigurationProperties: Map[String, String] =
       data.appConfigurationProperties
     var (jvmTime, executorRunTimeTotal) = getTimeValues(executorSummaries)
@@ -99,6 +105,7 @@ object ExecutorGcHeuristic {
 
     lazy val severityTimeA: Severity = executorGcHeuristic.gcSeverityAThresholds.severityOf(ratio)
     lazy val severityTimeD: Severity = executorGcHeuristic.gcSeverityDThresholds.severityOf(ratio)
+
 
     /**
       * returns the total JVM GC Time and total executor Run Time across all stages
@@ -109,8 +116,8 @@ object ExecutorGcHeuristic {
       var jvmGcTimeTotal: Long = 0
       var executorRunTimeTotal: Long = 0
       executorSummaries.foreach(executorSummary => {
-        jvmGcTimeTotal+=executorSummary.totalGCTime
-        executorRunTimeTotal+=executorSummary.totalDuration
+        jvmGcTimeTotal += executorSummary.totalGCTime
+        executorRunTimeTotal += (executorSummary.removedTime - executorSummary.addedTime) * executor_cores
       })
       (jvmGcTimeTotal, executorRunTimeTotal)
     }

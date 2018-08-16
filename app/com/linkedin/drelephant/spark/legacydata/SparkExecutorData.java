@@ -45,7 +45,10 @@ public class SparkExecutorData {
     public long shuffleRead = 0L;
     public long totalGCTime = 0L;
     public long shuffleWrite = 0L;
-
+    public long addedTime = 0L;
+    public long removedTime = 0L;
+    public long taskCPUTime = 0L;
+    public long taskRuntime = 0L;
     public String toString() {
       return "{execId: " + execId + ", hostPort:" + hostPort + " , rddBlocks: " + rddBlocks + ", memUsed: " + memUsed
           + ", maxMem: " + maxMem + ", diskUsed: " + diskUsed + ", totalTasks" + totalTasks + ", tasksActive: "
