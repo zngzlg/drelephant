@@ -16,12 +16,12 @@
 
 # --- !Ups
 
-
 CREATE TABLE yarn_app_result (
+  ftime            BIGINT        NOT NULL              COMMENT 'Partition Key, finish timestamp',
   id               VARCHAR(50)   NOT NULL              COMMENT 'The application id, e.g., application_1236543456321_1234567',
   name             VARCHAR(100)  NOT NULL              COMMENT 'The application name',
   username         VARCHAR(50)   NOT NULL              COMMENT 'The user who started the application',
-  queue_name       VARCHAR(50)   DEFAULT NULL          COMMENT 'The queue the application was submitted to',
+  queue_name       VARCHAR(255)   DEFAULT NULL          COMMENT 'The queue the application was submitted to',
   start_time       BIGINT        UNSIGNED NOT NULL     COMMENT 'The time in which application started',
   finish_time      BIGINT        UNSIGNED NOT NULL     COMMENT 'The time in which application finished',
   tracking_url     VARCHAR(255)  NOT NULL              COMMENT 'The web URL that can be used to track the application',
@@ -38,45 +38,45 @@ CREATE TABLE yarn_app_result (
   job_exec_url     VARCHAR(800)  NOT NULL DEFAULT ''   COMMENT 'A url to the job execution on the scheduler',
   flow_exec_url    VARCHAR(800)  NOT NULL DEFAULT ''   COMMENT 'A url to the flow execution on the scheduler',
   job_def_url      VARCHAR(800)  NOT NULL DEFAULT ''   COMMENT 'A url to the job definition on the scheduler',
-  flow_def_url     VARCHAR(800)  NOT NULL DEFAULT ''   COMMENT 'A url to the flow definition on the scheduler',
-
-  PRIMARY KEY (id)
-);
+  flow_def_url     VARCHAR(800)  NOT NULL DEFAULT ''   COMMENT 'A url to the flow definition on the scheduler'
+)
+PARTITION BY LIST(ftime) (
+PARTITION p_2018050210 VALUES IN (2018050210),
+PARTITION p_2018050211 VALUES IN (2018050211),
+PARTITION p_2018050212 VALUES IN (2018050212)
+)
+;
 
 create index yarn_app_result_i1 on yarn_app_result (finish_time);
 create index yarn_app_result_i2 on yarn_app_result (username,finish_time);
 create index yarn_app_result_i3 on yarn_app_result (job_type,username,finish_time);
 create index yarn_app_result_i4 on yarn_app_result (flow_exec_id);
-create index yarn_app_result_i5 on yarn_app_result (job_def_id);
-create index yarn_app_result_i6 on yarn_app_result (flow_def_id);
+create index yarn_app_result_i5 on yarn_app_result (job_def_id(255));
+create index yarn_app_result_i6 on yarn_app_result (flow_def_id(255));
 create index yarn_app_result_i7 on yarn_app_result (start_time);
 
 CREATE TABLE yarn_app_heuristic_result (
-  id                  INT(11)       NOT NULL AUTO_INCREMENT COMMENT 'The application heuristic result id',
+  ftime               BIGINT        NOT NULL                COMMENT 'partition key, finish timestamp',
   yarn_app_result_id  VARCHAR(50)   NOT NULL                COMMENT 'The application id',
   heuristic_class     VARCHAR(255)  NOT NULL                COMMENT 'Name of the JVM class that implements this heuristic',
   heuristic_name      VARCHAR(128)  NOT NULL                COMMENT 'The heuristic name',
   severity            TINYINT(2)    UNSIGNED NOT NULL       COMMENT 'The heuristic severity ranging from 0(LOW) to 4(CRITICAL)',
   score               MEDIUMINT(9)  UNSIGNED DEFAULT 0      COMMENT 'The heuristic score for the application. score = severity * number_of_tasks(map/reduce) where severity not in [0,1], otherwise score = 0',
-
-  PRIMARY KEY (id),
-  CONSTRAINT yarn_app_heuristic_result_f1 FOREIGN KEY (yarn_app_result_id) REFERENCES yarn_app_result (id)
-);
+  name                VARCHAR(128)  NOT NULL DEFAULT ''     COMMENT 'The analysis detail entry name/key',
+  value               VARCHAR(255)  NOT NULL DEFAULT ''     COMMENT 'The analysis detail value corresponding to the name',
+  details             TEXT                                  COMMENT 'More information on analysis details. e.g, stacktrace'
+)
+PARTITION BY LIST(ftime) (
+PARTITION p_2018050210 VALUES IN (2018050210),
+PARTITION p_2018050211 VALUES IN (2018050211),
+PARTITION p_2018050212 VALUES IN (2018050212)
+)
+;
 
 create index yarn_app_heuristic_result_i1 on yarn_app_heuristic_result (yarn_app_result_id);
 create index yarn_app_heuristic_result_i2 on yarn_app_heuristic_result (heuristic_name,severity);
-
-CREATE TABLE yarn_app_heuristic_result_details (
-  yarn_app_heuristic_result_id  INT(11) NOT NULL                  COMMENT 'The application heuristic result id',
-  name                          VARCHAR(128) NOT NULL DEFAULT ''  COMMENT 'The analysis detail entry name/key',
-  value                         VARCHAR(255) NOT NULL DEFAULT ''  COMMENT 'The analysis detail value corresponding to the name',
-  details                       TEXT                              COMMENT 'More information on analysis details. e.g, stacktrace',
-
-  PRIMARY KEY (yarn_app_heuristic_result_id,name),
-  CONSTRAINT yarn_app_heuristic_result_details_f1 FOREIGN KEY (yarn_app_heuristic_result_id) REFERENCES yarn_app_heuristic_result (id)
-);
-
-create index yarn_app_heuristic_result_details_i1 on yarn_app_heuristic_result_details (name);
+create index yarn_app_heuristic_result_i3 on yarn_app_heuristic_result (ftime);
+create index yarn_app_heuristic_result_i4 on yarn_app_heuristic_result (name);
 
 # --- !Downs
 
@@ -85,10 +85,6 @@ SET FOREIGN_KEY_CHECKS=0;
 DROP TABLE yarn_app_result;
 
 DROP TABLE yarn_app_heuristic_result;
-
-DROP TABLE yarn_app_heuristic_result_details;
-
-SET FOREIGN_KEY_CHECKS=1;
 
 # --- Created by Ebean DDL
 # To stop Ebean DDL generation, remove this comment and start using Evolutions

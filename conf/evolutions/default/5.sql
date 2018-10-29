@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS tuning_algorithm (
   optimization_algo_version int(11) NOT NULL COMMENT 'algo version',
   optimization_metric enum('RESOURCE','EXECUTION_TIME') DEFAULT NULL COMMENT 'metric to be optimized',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ,
+  updated_ts timestamp NOT NULL,
   PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS tuning_parameter (
   step_size double NOT NULL COMMENT 'step size to be used for the parameter',
   is_derived tinyint(4) NOT NULL COMMENT 'Is this the derived parameter for e.g. mapreduce.map.java.opts ',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_ts timestamp NOT NULL ,
   PRIMARY KEY (id),
   CONSTRAINT tuning_parameter_ibfk_1 FOREIGN KEY (tuning_algorithm_id) REFERENCES tuning_algorithm (id)
 ) ENGINE=InnoDB;
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS flow_definition (
   flow_def_id varchar(700) NOT NULL COMMENT 'unique flow definition id from scheduler like azkaban, oozie, appworx etc',
   flow_def_url varchar(700) NOT NULL COMMENT 'flow definition URL from scheduler like azkaban, oozie, appworx etc',
   PRIMARY KEY (id),
-  UNIQUE KEY flow_def_id (flow_def_id)
+  UNIQUE KEY flow_def_id (flow_def_id(255))
 ) ENGINE=InnoDB AUTO_INCREMENT=10000;
 
 /**
@@ -89,9 +89,9 @@ CREATE TABLE IF NOT EXISTS job_definition (
   scheduler varchar(100) NOT NULL COMMENT 'name of the scheduler like azkaban. oozie ',
   username varchar(100) NOT NULL COMMENT 'name of the user',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_ts timestamp NOT NULL ,
   PRIMARY KEY (id),
-  UNIQUE KEY job_def_id (job_def_id) ,
+  UNIQUE KEY job_def_id (job_def_id(255)) ,
   CONSTRAINT job_definition_ibfk_1 FOREIGN KEY (flow_definition_id) REFERENCES flow_definition (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000;
 
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS tuning_job_definition (
   allowed_max_resource_usage_percent double DEFAULT NULL COMMENT 'Limit on resource usage, For ex 150 means it should not go beyond 150% ',
   allowed_max_execution_time_percent double DEFAULT NULL COMMENT 'Limit on execution time, For ex 150 means it should not go beyond 150% ',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_ts timestamp NOT NULL ,
   CONSTRAINT tuning_job_definition_ibfk_1 FOREIGN KEY (job_definition_id) REFERENCES job_definition (id),
   CONSTRAINT tuning_job_definition_ibfk_2 FOREIGN KEY (tuning_algorithm_id) REFERENCES tuning_algorithm (id)
 ) ENGINE=InnoDB;
@@ -149,14 +149,14 @@ CREATE TABLE IF NOT EXISTS job_execution (
   execution_time double DEFAULT NULL COMMENT 'execution time excluding delay for this execution of the job',
   input_size_in_bytes bigint(20) DEFAULT NULL COMMENT 'input size in bytes for this execution of the job',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_ts timestamp NOT NULL ,
   PRIMARY KEY (id),
   CONSTRAINT job_execution_ibfk_1 FOREIGN KEY (job_definition_id) REFERENCES job_definition (id),
   CONSTRAINT job_execution_ibfk_2 FOREIGN KEY (flow_execution_id) REFERENCES flow_execution (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=1000;
 
-create index index_je_job_exec_id on job_execution (job_exec_id);
-create index index_je_job_exec_url on job_execution (job_exec_url);
+create index index_je_job_exec_id on job_execution (job_exec_id(255));
+create index index_je_job_exec_url on job_execution (job_exec_url(255));
 create index index_je_job_definition_id on job_execution (job_definition_id);
 create index index_je_flow_execution_id on job_execution (flow_execution_id);
 
@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS job_saved_state (
   job_definition_id int(10) unsigned NOT NULL COMMENT 'foreign key from job_definition table',
   saved_state blob NOT NULL COMMENT 'current state',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_ts timestamp NOT NULL ,
   PRIMARY KEY (job_definition_id),
   CONSTRAINT job_saved_state_f1 FOREIGN KEY (job_definition_id) REFERENCES job_definition (id)
 ) ENGINE=InnoDB;
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS job_suggested_param_value (
   tuning_parameter_id int(10) unsigned NOT NULL COMMENT 'foreign key from tuning_parameter table',
   param_value double NOT NULL COMMENT 'value of the parameter suggested by algo',
   created_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_ts timestamp NOT NULL ,
   PRIMARY KEY (id),
   UNIQUE KEY job_execution_id (job_execution_id,tuning_parameter_id),
   CONSTRAINT job_suggested_param_values_f1 FOREIGN KEY (job_execution_id) REFERENCES job_execution (id),
