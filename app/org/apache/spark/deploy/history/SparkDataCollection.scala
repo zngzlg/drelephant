@@ -157,8 +157,9 @@ class SparkDataCollection extends SparkApplicationData {
     if (_environmentData == null) {
       // Notice: we ignore jvmInformation and classpathEntries, because they are less likely to be used by any analyzer.
       _environmentData = new SparkEnvironmentData()
+      // system properties never used
       environmentListener.systemProperties.foreach { case (name, value) =>
-        _environmentData.addSystemProperty(name, value)
+        _environmentData.addSparkProperty(name, value)
                                                    }
       environmentListener.sparkProperties.foreach { case (name, value) =>
         _environmentData.addSparkProperty(name, value)
@@ -172,6 +173,7 @@ class SparkDataCollection extends SparkApplicationData {
       _executorData = new SparkExecutorData()
 
       for (status <- executorsListener.activeStorageStatusList.filter(p=>p.blockManagerId.executorId != "driver")) {
+
         val info = new ExecutorInfo()
 
         // val status = executorsListener.activeStorageStatusList(statusId)
@@ -201,6 +203,14 @@ class SparkDataCollection extends SparkApplicationData {
         info.removedTime = tdwListener.executorToTaskSummary(eid).removedTime
         info.taskCPUTime = tdwListener.executorToTaskSummary(eid).executorCpuTime
         info.taskRuntime = tdwListener.executorToTaskSummary(eid).executorRuntime
+
+        // drop out alive executor
+        if (!executorsListener.executorToTaskSummary(eid).isAlive) {
+          info.removedTime = applicationEventListener.endTime.get
+        }
+        if(info.addedTime == 0 && info.removedTime > 0){
+          info.addedTime = info.removedTime
+        }
         _executorData.setExecutorInfo(info.execId, info)
       }
 
@@ -231,6 +241,14 @@ class SparkDataCollection extends SparkApplicationData {
         info.removedTime = tdwListener.executorToTaskSummary(eid).removedTime
         info.taskCPUTime = tdwListener.executorToTaskSummary(eid).executorCpuTime
         info.taskRuntime = tdwListener.executorToTaskSummary(eid).executorRuntime
+
+        // drop out alive executor
+        if (executorsListener.executorToTaskSummary(eid).isAlive) {
+          info.removedTime = applicationEventListener.endTime.get
+        }
+        if(info.addedTime == 0 && info.removedTime > 0){
+          info.addedTime = info.removedTime
+        }
         _executorData.setExecutorInfo(info.execId, info)
       }
     }

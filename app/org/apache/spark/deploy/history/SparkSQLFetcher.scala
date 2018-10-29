@@ -82,8 +82,11 @@ class SparkSQLFetcher(fetcherConfData: FetcherConfigurationData) extends Elephan
     val applicationData = doAsPrivilegedAction { () =>  doFetchData(appId, datePart)
     }
     // use usp.param instead of name, tdw.username instead of user
+
     analyticJob.setName(applicationData.getConf().getProperty("usp.param", applicationData.getConf().getProperty("spark.hadoop.usp.param",analyticJob.getName)))
     analyticJob.setUser(applicationData.getConf().getProperty("tdw.username", applicationData.getConf().getProperty("spark.submitter", analyticJob.getName)))
+    logger.info(String.format("usp.param is %s,analyticJob is %s",applicationData.getConf().getProperty("usp.param"),analyticJob.getName))
+    logger.info(String.format("tdw.username is %s,analyticJob is %s",applicationData.getConf().getProperty("tdw.username"),analyticJob.getUser))
     applicationData
   }
 

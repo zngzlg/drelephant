@@ -4,33 +4,41 @@ import org.apache.spark.scheduler._
 import org.apache.spark.{ExceptionFailure, Resubmitted, SparkConf}
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 
 class TDWListener(conf: SparkConf) extends SparkListener {
 
   val executorToTaskSummary = mutable.LinkedHashMap[String, TDWExecutorTaskSummary]()
-  var executorEvents = new ListBuffer[SparkListenerEvent]()
 
   override def onExecutorAdded(executorAdded: SparkListenerExecutorAdded): Unit = synchronized {
     val eid = executorAdded.executorId
     val taskSummary = executorToTaskSummary.getOrElseUpdate(eid, TDWExecutorTaskSummary(eid))
     taskSummary.addedTime = executorAdded.time
     taskSummary.totalCores = executorAdded.executorInfo.totalCores
-    executorEvents += executorAdded
   }
 
   override def onExecutorRemoved(executorRemoved: SparkListenerExecutorRemoved): Unit = synchronized {
-    executorEvents += executorRemoved
     executorToTaskSummary.get(executorRemoved.executorId).foreach(e => {
       e.isAlive = false
       e.removedTime = executorRemoved.time
     })
   }
 
+  override def onBlockManagerAdded(blockManagerAdded: SparkListenerBlockManagerAdded):Unit = synchronized {
+    val blockManagerId = blockManagerAdded.blockManagerId
+    val executorId = blockManagerId.executorId
+    val executor = executorToTaskSummary.getOrElseUpdate(executorId,TDWExecutorTaskSummary(executorId))
+    if (executor.addedTime == 0){
+      executor.addedTime = blockManagerAdded.time
+    }
+  }
+
   override def onTaskStart(taskStart: SparkListenerTaskStart): Unit = synchronized {
     val eid = taskStart.taskInfo.executorId
     val taskSummary = executorToTaskSummary.getOrElseUpdate(eid, TDWExecutorTaskSummary(eid))
+    if(taskSummary.addedTime == 0) {
+      taskSummary.addedTime = taskStart.taskInfo.launchTime
+    }
     taskSummary.tasksActive += 1
   }
 
@@ -40,6 +48,7 @@ class TDWListener(conf: SparkConf) extends SparkListener {
       val eid = info.executorId
 
       val taskSummary = executorToTaskSummary.getOrElseUpdate(eid, TDWExecutorTaskSummary(eid))
+
       taskEnd.reason match {
         case Resubmitted =>
           // Note: For resubmitted tasks, we continue to use the metrics that belong to the
@@ -76,6 +85,10 @@ class TDWListener(conf: SparkConf) extends SparkListener {
     executorToTaskSummary.filter { m =>
       m._2.removedTime == 0
     }.foreach(l => l._2.removedTime = applicationEnd.time)
+
+    executorToTaskSummary.filter { m =>
+      m._2.addedTime == 0
+    }.foreach(l => l._2.addedTime = l._2.removedTime)
   }
 
 }
